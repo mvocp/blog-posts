@@ -1,3 +1,11 @@
+- title: 利用Koishi搭建QQ机器人（官方API/Napcat）
+  date: '2025-09-07T11:00:27.000Z'
+  slug: arc10
+  excerpt: 运行docker中的koishi，接入腾讯开放平台API / Napcat Websocket来制作一个QQ机器人。
+- title: php的三种从文件随机抽取一行输出实现方法
+  date: '2025-09-07T10:59:13.000Z'
+  slug: arc9
+  excerpt: 最近在做随机抽取一个bv号来实现网页随机出现一个b站视频的功能，需要“从文件中读取随机的一行bv号”，于是就想到了三种实现的方法。
 - title: Hello World!
   date: '2025-09-07T08:47:34.000Z'
   slug: helloworld
