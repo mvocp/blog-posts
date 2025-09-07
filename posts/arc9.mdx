@@ -1,0 +1,101 @@
+---
+title: "php的三种从文件随机抽取一行输出实现方法"
+date: 2025-09-07 10:59:13
+excerpt: "最近在做随机抽取一个bv号来实现网页随机出现一个b站视频的功能，需要“从文件中读取随机的一行bv号”，于是就想到了三种实现的方法。"
+slug: "arc9"
+---
+
+最近在做随机抽取一个bv号来实现网页随机出现一个b站视频的功能，需要“从文件中读取随机的一行bv号”，于是就想到了三种实现的方法。
+第一个想到的也是最简单最粗暴的方法：读取所有内容抽一个，代码如下：
+```php
+$filename = 'bv.txt';
+$lines = file($filename, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES); //此处为deepseek优化
+if ($lines === false) {
+    die("无法读取: $filename");
+}
+if (empty($lines)) {
+    die("空文件");
+}
+$randomLine = $lines[array_rand($lines)];
+// output
+echo $randomLine;
+```
+显然，这样就面临一个问题：当bv.txt足够大的时候会内存爆炸。
+尽管实际上的bv.txt到不了那种地步，但我忍不了浪费的内存，因为我的机器只有可怜的2G运存，还是电视盒子里的LDDR。
+
+那么就有了第二中方法：二次遍历。
+思路是第一次读取多少行，第二次从1-最后一行中rand出一个数字并读取。
+【注：此处直接让Deepseek生成，我实在是懒得写了】
+```php
+<?php
+function getRandomLine($filename) {
+    // 第一次遍历：统计行数
+    $lineCount = 0;
+    $handle = fopen($filename, "r");
+    while (!feof($handle)) {
+        fgets($handle);
+        $lineCount++;
+    }
+    
+    // 如果文件为空
+    if ($lineCount === 0) {
+        fclose($handle);
+        return null;
+    }
+    
+    // 生成随机行号
+    $randomLine = mt_rand(0, $lineCount - 1);
+    
+    // 第二次遍历：定位到随机行
+    rewind($handle);
+    $currentLine = 0;
+    while (!feof($handle) {
+        $line = fgets($handle);
+        if ($currentLine === $randomLine) {
+            fclose($handle);
+            return trim($line);
+        }
+        $currentLine++;
+    }
+    
+    fclose($handle);
+    return null;
+}
+
+// 使用示例
+$randomLine = getRandomLine('large_file.txt');
+echo "随机行: " . $randomLine;
+?>
+```
+
+那能否减少遍历次数呢？一次遍历？
+显然是有的。
+```php
+<?php
+function getRandomLineOptimized($filename) {
+    $handle = @fopen($filename, "r");
+    if (!$handle) return null;
+    
+    $randomLine = null;
+    $lineCount = 0;
+    
+    while (!feof($handle)) {
+        $line = fgets($handle);
+        if ($line === false) continue;
+        
+        $lineCount++;
+        // 1/$lineCount 的概率替换当前保留的行
+        if (mt_rand(1, $lineCount) === 1) {
+            $randomLine = trim($line);
+        }
+    }
+    
+    fclose($handle);
+    return $randomLine;
+}
+
+// 使用示例
+$randomLine = getRandomLineOptimized('huge_file.txt');
+echo "随机行: " . $randomLine;
+?>
+```

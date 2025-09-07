@@ -1,0 +1,134 @@
+---
+title: "利用Koishi搭建QQ机器人（官方API/Napcat）"
+date: 2025-09-07 11:00:27
+excerpt: "运行docker中的koishi，接入腾讯开放平台API / Napcat Websocket来制作一个QQ机器人。"
+slug: "arc10"
+---
+
+运行docker中的koishi，接入腾讯开放平台API / Napcat Websocket来制作一个QQ机器人。
+
+![2025-08-07T02:10:30.png][1]
+PID: 83758950
+
+## 介绍
+About koishi
+
+>Koishi 是一个跨平台、可扩展、高性能的聊天机器人框架。
+>它的名字和图标设计来源于东方 Project 中的角色 古明地恋 (Komeiji Koishi)。古明地恋是一个会做出无意识举动的角色，取
+>这个名字既象征着聊天机器人的主题，也蕴含了开发者为之倾注的热爱。*(From https://koishi.chat/zh-CN/manual/introduction.html)*
+
+About napcat
+>NapCat 是什么?
+>基于 TypeScript 构建的 Bot 框架，通过相应的启动器或者框架，主动调用 QQ Node 模块提供给客户端的接口，实现 Bot 的功> 能。*(From https://napneko.github.io/guide/napcat)*
+
+关于腾讯官方API，我就不多赘述了。
+为什么不用Nonebot呢？主要是因为Koishi对于新手来说更适合。
+简单而言，对比Nonebot，koishi有以下几个优点：
+- 傻瓜式的插件安装配置操作
+- 随时随地都能看到监控面板
+- 完全基于Typescript开发，使得插件开发更轻松（当然我不会TS，目前还在学vue。。）
+在使用nonebot搭建机器人的过程中我踩了好多坑，最后仍然是卡在了反向ws连接napcat这一步，故放弃。
+使用napcat则是因为go-cqhttp的衰败。
+
+## 安装
+**注意，本篇文章写于2025/8/7，Satell1te_LK在此不敢保证未来koishi的安装命令会发生什么变动，或者版本被弃用之类的事，尽量按照官网文档的来！**
+
+我选择在docker中运行koishi，因为用docker使得我的服务器变得更干净。
+koishi官网是提供了两种运行方式：podman或docker命令，这两大差不差，我就直接用docker命令了。
+```bash
+docker run -p 5140:5140 koishijs/koishi
+```
+我提供了docker编排，你可以在1panel面板中直接添加编排来运行koishi：
+```docker-compose
+services:
+    koishi:
+        container_name: koishi
+        image: koishijs/koishi
+        labels:
+            createdBy: Apps
+        network_mode: host
+        restart: always
+        ports:
+            - "5140:5140"
+        volumes:
+            - /koishi:/koishi
+```
+注意：本编排映射了/koishi到/koishi，暴露TCP/UDP 5140端口，使用host网络模式。
+如需修改端口映射，请参照该博文：
+https://www.oryoy.com/news/shi-yong-docker-compose-gao-xiao-guan-li-rong-qi-duan-kou-ying-she-quan-mian-bao-lu-suo-you-duan-kou.html
+
+Napcat的安装，也是用docker，官网提供了编排，为了方便我还是把编排放这儿了。
+```docker-compose
+# docker-compose.yml
+version: "3"
+services:
+    napcat:
+        environment:
+            - NAPCAT_UID=${NAPCAT_UID}
+            - NAPCAT_GID=${NAPCAT_GID}
+        ports:
+            - 3000:3000
+            - 3001:3001
+            - 6099:6099
+        container_name: napcat
+        network_mode: bridge
+        restart: always
+        image: mlikiowa/napcat-docker:latest
+```
+
+打开ip:5140，你将会看到如下页面：
+![2025-08-07T02:32:11.png][2]
+紧接着开始配置QQ机器人吧！
+
+## 配置
+有两种配置方式，我将会全部展示配置方法，以及避坑要点。
+### 开放平台官方API
+腾讯于去年开放了个人开发者对群聊BOT的申请，虽然限制繁多，但总比各种框架来的稳定。
+首先要去https://q.qq.com/ 注册开发者账号，然后按照流程创建机器人。
+![2025-08-07T02:34:54.png][3]
+像这样。
+找到“开发管理页”对应数据，记下。
+![2025-08-07T02:36:15.png][4]
+在Koishi插件配置中找到QQ适配器，填写方式为：
+- ID：对应机器人ID
+- Secret：对应AppSecret
+- Token：对应token
+至于平台上那个qq号，无所谓。
+![2025-08-07T02:37:43.png][5]
+这部分一定要这样选！
+bot方式已经被腾讯弃用了，使用已经失去意义。
+![2025-08-07T02:38:16.png][6]
+在群聊中使用，这样勾选就行了，如果是在频道中使用则需要勾选GUILD_MESSAGES。
+协议的话，腾讯官方是说websocket方式不再管了，使用webhook会更好点……但是ws能用，我不管了……
+喜欢捣鼓的可以自行研究webhook方式。
+然后下面的配置不用管了，右上角保存后运行适配器，右下角应该是绿的。
+![2025-08-07T02:40:06.png][7]
+如果是黄灯请自行排错。
+
+### Napcat接入（napcat作为websocket服务器）
+**首先要去Koishi插件市场安装adapter-onebot插件，才能与napcat连接。**
+Koishi插件配置内找到adapter-onebot，然后在napcat里创建如下的配置：
+网络配置-新建-Websocket服务器。
+![2025-08-07T02:42:50.png][8]
+在koishi侧填写：
+- selfid: napcat上登陆的，要使用的机器人的qq号
+- token：napcat创建ws服务器时创建的token
+- protocol: ws
+- endpoint: ws://服务器ip:创建的端口号
+- KeepAlive保持勾选
+然后保存启用创建，右下角应是绿灯。
+
+## 结语
+至此，你已经成功接入了QQ机器人。
+剩下的插件、登录等配置呢？I dont care，本教程没打算写这些。
+欢迎在下方讨论，太弱智的问题我不会回复。
+
+
+  [1]: https://255650.xyz/usr/uploads/2025/08/2678528786.png
+  [2]: https://255650.xyz/usr/uploads/2025/08/8930692.png
+  [3]: https://255650.xyz/usr/uploads/2025/08/707714882.png
+  [4]: https://255650.xyz/usr/uploads/2025/08/3754878683.png
+  [5]: https://255650.xyz/usr/uploads/2025/08/1427561670.png
+  [6]: https://255650.xyz/usr/uploads/2025/08/622865349.png
+  [7]: https://255650.xyz/usr/uploads/2025/08/1802971070.png
+  [8]: https://255650.xyz/usr/uploads/2025/08/2041597309.png
