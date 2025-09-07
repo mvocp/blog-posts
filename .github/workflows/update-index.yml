@@ -1,0 +1,52 @@
+name: Update Blog Index
+
+# 触发条件：当 posts 目录下的 mdx 文件发生变更时
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'posts/*.mdx'
+  # 也可以允许手动触发
+  workflow_dispatch:
+
+jobs:
+  generate-index:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 检出代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # 必须 fetch-depth: 0 以获取所有历史，才能正确 git push
+          fetch-depth: 0 
+
+      # 2. 设置 Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # 3. 安装依赖（比如 glob、js-yaml）
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. 运行脚本生成新的 index.yml
+      - name: Generate Index
+        run: npm run generate-index
+
+      # 5. 检查索引文件是否有变化，并自动提交回仓库
+      - name: Commit and Push if changed
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add index.yml
+          # 检查是否有变更需要提交
+          if git diff --staged --quiet; then
+            echo "No changes to index.yml"
+          else
+            git commit -m "chore: auto-update blog index [skip ci]"
+            git push
+            echo "Pushed updated index.yml"
+          fi
