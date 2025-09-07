@@ -3,7 +3,7 @@ name: Update Blog Index
 # 触发条件：当 posts 目录下的 mdx 文件发生变更时
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
     paths:
       - 'posts/*.mdx'
   # 也可以允许手动触发
