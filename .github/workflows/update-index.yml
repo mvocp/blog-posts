@@ -30,7 +30,7 @@ jobs:
 
       # 3. 安装依赖（比如 glob、js-yaml）
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       # 4. 运行脚本生成新的 index.yml
       - name: Generate Index
