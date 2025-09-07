@@ -1,5 +1,9 @@
 {
   "scripts": {
     "generate-index": "node scripts/generate-index.js"
+  },
+  "dependencies": {
+    "glob": "^11.0.3",
+    "js-yaml": "^4.1.0"
   }
 }
