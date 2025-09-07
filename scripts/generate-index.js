@@ -24,11 +24,11 @@ async function generateIndex() {
 
       // 3. 提取我们需要的信息
       indexData.push({
-        id: frontMatter.id || path.basename(filePath, '.mdx'), // 唯一标识
+        id: frontMatter.id,
         title: frontMatter.title,
-        date: new Date(frontMatter.date).toISOString(), // 标准化日期
-        slug: frontMatter.slug || path.basename(filePath, '.mdx'),
-        // 可以添加其他需要的字段，如 category, tags, image 等
+        date: new Date(frontMatter.date).toISOString(),
+        slug: frontMatter.slug,
+        excerpt: frontMatter.excerpt || '',
         filePath: filePath // 记录文件路径以便后续读取
       });
     } catch (error) {
