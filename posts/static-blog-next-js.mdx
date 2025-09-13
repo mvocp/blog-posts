@@ -1,0 +1,161 @@
+---
+title: "使用Next.js构建一个属于你的博客。"
+date: 2025-09-13 16:31:40
+excerpt: "本篇文章记叙了我是如何利用next.js写出一个博客的，同时也是本站被写出来的过程记录。"
+slug: "static-blog-next-js"
+---
+![0_16_.jpg](https://s2.loli.net/2025/09/13/aCXlWPei4Uvok1H.jpg)
+## 前言
+next.js，由vercel维护的全栈react框架。开箱即用的服务端渲染，优化过的SEO和性能，使得这个框架非常容易上手。
+自动打包和编译，减轻了开发压力。同时内置的API路由让我们能更轻松地开发后端。
+静态生成和TS的支持，无疑是好上加好的。
+更少配置，更多产出。
+
+我一直都在用电视盒子刷机托管我的博客（255650.xyz），但很显然有个问题——家里电力不是很稳定，条件也不够好：不是散热问题就是断电问题，还要担心移动不稳定的网。
+但我不是很想花钱买服务器了……我以后大抵只会续费XynxProject所用的nat云服。
+自然而然地，我萌生了一个想法：为什么不自己写一个静态博客呢？
+近日，我在群友的推荐下自学了Typescript，后来发现自己对React感兴趣，索性就学了react+next.js，正好借此练练手。
+最后的成果自然就是本站。
+
+## 起步：从创建项目开始！
+我们使用next.js app router，terminal来源是react官网文档。
+```bash
+npx create-next-app@latest
+```
+创建一个app，然后打开vs code，开始我们的代码旅途。
+我的思路是这样的：
+```
+   /app/═╗
+        ╠layout.tsx 作用类似于header与footer，负责主要框架。
+        ╠page.tsx 介绍页，如本站首页所见，虽然很简陋
+        ╠main.css 字面意思，不过貌似放别的文件夹会更好。
+        ╠/blog/ ╗
+        ╠...    ╠/api/ 塞一下api文件，具体可见本站代码仓库 
+                ╠/[slug]/page.tsx 处理文章详情
+                ╚page.tsx 处理博客页面
+```
+理论存在，实践开始。
+
+## 进行：博客文章列表，如何处理？
+写各种页面不是难事，我们主要关注的问题是：如何优雅地去输出文章列表？这也算是一个好问题。
+显然，直接读目录下面的mdx文件，然后傻傻排列是极其消耗性能的；若手动分类，却又显得麻烦。
+一个DevOps风格的解决方案就此诞生——利用 GitHub Action 自动生成索引。
+你应该猜到了：把文章甩到一边，让GA生成一个索引文件，比如本站博客对应的文章仓库内，有一个index.yml，就是GA自动生成的。
+
+> 将索引的构建和维护完全自动化，使其成为 CI/CD 流程的一部分。
+> 任何对文章文件的更改（增、删、改、重命名）都会自动触发一个工作流，重新扫描整个目录并生成最新的 index.yml 文件。
+
+每当有代码推送到主分支（或PR合并）时，特别是当 posts/ 目录下的 .mdx 文件发生变更时，Action 被触发，运行一个脚本，扫描 posts/ 目录，从每个文件的 Front Matter 中提取元数据。
+再根据日期等字段对提取的元数据列表进行排序，将新生成的 index.yml 文件直接提交回仓库，或作为构建产物输出即可。
+代码部分省略，毕竟早已开源。
+
+由于我懒，本站代码并不能将\<!--more-->之前的代码识别为摘选——所以我必须手动为每篇文章写一段摘选。无伤大雅。
+其实有解决方案，但是需要编写更复杂的文本处理逻辑，需要解析更多内容，脚本运行变慢。
+**（Github用的又不是我的服务器我关心这些干什么）**
+
+那下面要做的就很简单了，分页。
+```typescript
+    export async function GET(request) {
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const pageSize = 10;
+
+    try {
+        const index = await loadPostIndex();
+        
+        const startIndex = (page - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        const pageItems = index.slice(startIndex, endIndex);
+
+        ... //此处省略
+```
+如上，还是蛮好搞的，pageSize为每页文章数量。
+将其输出，即可。
+
+单篇文章页面略麻烦些，我在这里创建了动态路由页面。
+```typescript
+    // app/blog/[slug]/page.js
+    import { notFound } from 'next/navigation';
+    import yaml from 'js-yaml';
+    import { Divider} from '@mui/material';
+    import MarkdownRenderer from '@/components/markdown-renderer';
+
+    import {Waline} from '@/components/comment';
+
+    async function getPostData(slug) {
+    // 先获取索引找到文章slug
+    const indexRes = await fetch('https://blog-posts.api.limitz.top/index.yml');
+    const indexText = await indexRes.text();
+    const index = yaml.load(indexText);
+    
+    const postMeta = index.find(item => item.slug === slug);
+    
+    if (!postMeta) {
+        return null;
+    }
+    
+    // 获取文章内容
+    const contentUrl = `https://blog-posts.api.limitz.top/posts/${postMeta.slug}.mdx`;
+    const contentRes = await fetch(contentUrl);
+    const content = await contentRes.text();
+
+    return {
+        ...postMeta,
+        content
+    };
+    }
+
+    export default async function BlogPostPage({ params }) {
+    const post = await getPostData(params.slug);
+    
+    if (!post) {
+        notFound();
+    }
+    
+    return (
+        <div>
+        <article>
+            <h1>{post.title}</h1>
+            <time>
+            文章写作时间：{new Date(post.date).toLocaleDateString('zh-CN')} 作者：LimitZ_
+            </time>
+            <Divider />
+            <br />
+            <div>
+            <MarkdownRenderer content=
+            {post.content}
+            ></MarkdownRenderer>
+            </div>
+        </article>
+        <Divider />
+        {/* waline here */}
+        <div id="waline"></div>
+        <Waline serverURL={'https://comment.api.limitz.top'} path={post.slug}></Waline>
+        {/* waline end */}
+
+        </div>
+    );
+    }
+
+    // 生成静态参数
+            async function importRemoteModule(url: string) {
+        const module = await import(url);
+        // 使用导入的模块进行操作
+        }
+
+    
+    export async function generateStaticParams() {
+    const indexRes = await fetch('https://blog-posts.api.limitz.top/index.yml');
+    const indexText = await indexRes.text();
+    const index = yaml.load(indexText);
+    
+    return index.map((post) => ({
+        slug: post.slug || post.id.toString(),
+    }));
+    }
+```
+这是我的代码，有点屎山，望见谅。
+blog-posts.api.limitz.top，这是作为本站文章API的站点，同样是托管在vercel上的纯静态网站。
+
+## 上线！
+git push，and we got it.
