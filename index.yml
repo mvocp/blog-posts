@@ -1,3 +1,7 @@
+- title: 使用Next.js构建一个属于你的博客。
+  date: '2025-09-13T16:31:40.000Z'
+  slug: static-blog-next-js
+  excerpt: 本篇文章记叙了我是如何利用next.js写出一个博客的，同时也是本站被写出来的过程记录。
 - title: 利用Koishi搭建QQ机器人（官方API/Napcat）
   date: '2025-09-07T11:00:27.000Z'
   slug: arc10
